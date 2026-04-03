@@ -5,6 +5,8 @@ from pathlib import Path
 import re
 from typing import List, Dict, Tuple
 
+from Plurality import plurality_scores
+
 
 @dataclass
 class BallotType:
@@ -149,13 +151,26 @@ if __name__ == "__main__":
 
     candidate_ids = sorted(names)
     scores = copeland_scores(ballots, candidate_ids)
+    plurality = plurality_scores(ballots, candidate_ids)
 
-    # Sort by score descending
-    ranking = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    # Sort by Copeland score descending, break ties by Plurality score descending
+    ranking = sorted(
+        scores.items(),
+        key=lambda x: (x[1], plurality[x[0]]),
+        reverse=True,
+    )
 
-    print("Copeland ranking:")
+    print("Copeland ranking (Plurality tiebreaker):")
     for rank, (candidate_id, score) in enumerate(ranking, start=1):
-        print(f"  {rank}. {names[candidate_id]} — score: {score:+.0f}")
+        print(
+            f"  {rank}. {names[candidate_id]}"
+            f" — Copeland: {score:+.0f}"
+            f", Plurality: {plurality[candidate_id]:.2f}"
+        )
 
     winner_id, winner_score = ranking[0]
-    print(f"\nWinner: {names[winner_id]} with Copeland score {winner_score:+.0f}")
+    print(
+        f"\nWinner: {names[winner_id]}"
+        f" with Copeland score {winner_score:+.0f}"
+        f" (Plurality: {plurality[winner_id]:.2f})"
+    )
