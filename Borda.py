@@ -113,18 +113,30 @@ def borda_scores(
 
 
 if __name__ == "__main__":
+    from Plurality import plurality_scores
+
     cat_path = "00073-00000002.cat"
     names, ballots = load_cat_file(cat_path)
 
     candidate_ids = sorted(names)
     scores = borda_scores(ballots, candidate_ids)
+    plurality = plurality_scores(ballots, candidate_ids)
 
-    # Sort by score descending
-    ranking = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    # Sort by Borda score descending, break ties by Plurality score descending
+    ranking = sorted(
+        scores.items(),
+        key=lambda x: (x[1], plurality[x[0]]),
+        reverse=True,
+    )
 
-    print("Borda ranking:")
+    print("Borda ranking (ties broken by Plurality):")
     for rank, (candidate_id, score) in enumerate(ranking, start=1):
-        print(f"  {rank}. {names[candidate_id]} — score: {score:.2f}")
+        print(f"  {rank}. {names[candidate_id]} — Borda: {score:.2f}, Plurality: {plurality[candidate_id]:.2f}")
 
     winner_id, winner_score = ranking[0]
-    print(f"\nWinner: {names[winner_id]} with Borda score {winner_score:.2f}")
+    top_score = ranking[0][1]
+    tied = [cid for cid, s in ranking if s == top_score]
+    if len(tied) > 1:
+        print(f"\nWinner: {names[winner_id]} with Borda score {winner_score:.2f} (tie broken by Plurality: {plurality[winner_id]:.2f})")
+    else:
+        print(f"\nWinner: {names[winner_id]} with Borda score {winner_score:.2f}")
