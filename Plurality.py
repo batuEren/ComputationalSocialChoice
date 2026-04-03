@@ -81,7 +81,7 @@ def plurality_scores(
     candidate_ids: List[int],
 ) -> Dict[int, float]:
     """
-    Compute Plurality scores for all candidates.
+    Compute Plurality scores for all candidates (first-place votes only).
 
     Each ballot contributes its full weight to the top-ranked candidate.
     For weak orders, if multiple candidates share the top position, the
@@ -90,7 +90,6 @@ def plurality_scores(
     scores: Dict[int, float] = {c: 0.0 for c in candidate_ids}
 
     for ballot in ballots:
-        # Find the first non-empty group — these are the top-ranked candidates
         for group in ballot.groups:
             if len(group) == 0:
                 continue
@@ -102,19 +101,50 @@ def plurality_scores(
     return scores
 
 
+def rank_level_scores(
+    ballots: List[BallotType],
+    candidate_ids: List[int],
+) -> Dict[int, List[float]]:
+    """
+    Compute per-rank scores for each candidate across all rank levels.
+
+    scores[candidate][k] is the total ballot weight for which the candidate
+    appears in rank group k (0-indexed). Used for lexicographic tiebreaking.
+    For weak orders, ballot weight is split equally among tied candidates
+    within the same group.
+    """
+    max_groups = max((len(b.groups) for b in ballots), default=0)
+    scores: Dict[int, List[float]] = {c: [0.0] * max_groups for c in candidate_ids}
+
+    for ballot in ballots:
+        for rank, group in enumerate(ballot.groups):
+            if not group:
+                continue
+            share = ballot.count / len(group)
+            for candidate in group:
+                scores[candidate][rank] += share
+
+    return scores
+
+
 if __name__ == "__main__":
     cat_path = "00073-00000002.cat"
     names, ballots = load_cat_file(cat_path)
 
     candidate_ids = sorted(names)
-    scores = plurality_scores(ballots, candidate_ids)
+    first_place = plurality_scores(ballots, candidate_ids)
+    by_rank = rank_level_scores(ballots, candidate_ids)
 
-    # Sort by score descending
-    ranking = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    # Sort lexicographically: rank-0 score descending, then rank-1, rank-2, …
+    ranking = sorted(
+        candidate_ids,
+        key=lambda c: by_rank[c],
+        reverse=True,
+    )
 
-    print("Plurality ranking:")
-    for rank, (candidate_id, score) in enumerate(ranking, start=1):
-        print(f"  {rank}. {names[candidate_id]} — score: {score:.2f}")
+    print("Plurality ranking (with lexicographic tiebreaking):")
+    for pos, candidate_id in enumerate(ranking, start=1):
+        print(f"  {pos}. {names[candidate_id]} — score: {first_place[candidate_id]:.2f}")
 
-    winner_id, winner_score = ranking[0]
-    print(f"\nWinner: {names[winner_id]} with plurality score {winner_score:.2f}")
+    winner_id = ranking[0]
+    print(f"\nWinner: {names[winner_id]} with plurality score {first_place[winner_id]:.2f}")
